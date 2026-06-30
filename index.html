@@ -35,24 +35,6 @@ button:disabled{opacity:.4}
 <div id="live"><div id="liveEn"></div><div id="liveZh"></div></div>
 <div id="hist"></div>
 <script>
-const ENC_KEY="xz29kLpQ7wM3";
-function decrypt(encoded,key){
-const text=atob(encoded);
-let result="";
-for(let i=0;i<text.length;i++){result+=String.fromCharCode(text.charCodeAt(i)^key.charCodeAt(i%key.length));}
-return result;
-}
-let dgKey=null;
-
-// 预取 DeepGram 密钥
-(async function(){
-try{
-const r=await fetch("https://translator-api.xyy3041964059.workers.dev/dgkey");
-const j=await r.json();
-dgKey=decrypt(j.key,ENC_KEY);
-}catch(e){}
-})();
-
 const $=function(id){return document.getElementById(id)};
 const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn");
 let ws,ac,proc,src,stream,run=false;
@@ -94,7 +76,6 @@ spkBtn.textContent=diarize?"👤 分人：开":"👤 分人：关";
 };
 startBtn.onclick=async function(){
 if(run)return;
-if(!dgKey){st("获取密钥中...");try{const r=await fetch("https://translator-api.xyy3041964059.workers.dev/dgkey");const j=await r.json();dgKey=decrypt(j.key,ENC_KEY);}catch(e){st("密钥获取失败");alert("无法获取密钥，请检查网络");return;}}
 try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});}
 catch(e){st("麦克风失败");alert(e.message);return;}
 ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
@@ -102,10 +83,10 @@ if(ac.state==="suspended")await ac.resume();
 src=ac.createMediaStreamSource(stream);
 proc=ac.createScriptProcessor(4096,1,1);
 src.connect(proc);proc.connect(ac.destination);
-let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
+let url="wss://translator-api.xyy3041964059.workers.dev/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
 if(diarize)url+="&diarize=true";
 st(diarize?"连接中(分人开)...":"连接中...");
-ws=new WebSocket(url,["token",dgKey]);
+ws=new WebSocket(url);
 ws.onopen=function(){
 run=true;st(diarize?"🎤 识别中(分人开)":"🎤 识别中");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;
 proc.onaudioprocess=function(e){
