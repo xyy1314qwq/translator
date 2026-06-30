@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>讲座翻译</title>
+<style>
+body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3}
+#bar{position:sticky;top:0;background:#161b22;padding:12px;border-bottom:1px solid #30363d;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{font-size:15px;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+#startBtn{background:#238636;color:#fff}#stopBtn{background:#da3633;color:#fff}
+.gray{background:#30363d;color:#fff;font-size:14px;padding:8px 14px}
+button:disabled{opacity:.4}
+#status{font-size:14px;color:#8b949e}
+#live{padding:18px;min-height:70px;border-bottom:3px solid #30363d;background:#11161c}
+#liveEn{color:#58a6ff;line-height:1.5}
+#liveZh{color:#fff;font-weight:bold;margin-top:6px;line-height:1.5}
+#hist{padding:18px}
+.item{margin-bottom:16px;padding:12px;border-radius:8px;background:#161b22}
+.spk{font-size:13px;font-weight:bold;padding:2px 8px;border-radius:6px;color:#fff;margin-bottom:6px;display:inline-block}
+.en{color:#7d8590;line-height:1.5}
+.zh{color:#fff;font-weight:bold;margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="bar">
+<button id="startBtn">▶ 开始</button>
+<button id="stopBtn" disabled>■ 停止</button>
+<button id="spkBtn" class="gray">👤 分人：关</button>
+<button id="fontDown" class="gray">A−</button>
+<button id="fontUp" class="gray">A+</button>
+<button id="exportBtn" class="gray">💾 导出</button>
+<span id="status">未开始</span>
+</div>
+<div id="live"><div id="liveEn"></div><div id="liveZh"></div></div>
+<div id="hist"></div>
+<script>
+const DG="34132a7cbd1cdd56de9c6922448d9be30e4dab64";
+const DS="sk-a81f5c2cb4dc4c51a43be07ed7b301c0";
+const $=function(id){return document.getElementById(id)};
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn");
+let ws,ac,proc,src,stream,run=false;
+let buf="",bufWords=[],diarize=false;
+let fontScale=parseFloat(localStorage.getItem("fontScale")||"1");
+const MAX_ITEMS=200;
+const COLORS=["#1f6feb","#238636","#9e6a03","#a371f7","#bf3989","#1b7c83","#da3633"];
+function st(t){statusEl.textContent=t}
+function spkColor(n){return COLORS[n%COLORS.length]}
+function applyFont(){
+liveEn.style.fontSize=(20*fontScale)+"px";
+liveZh.style.fontSize=(22*fontScale)+"px";
+const ens=document.getElementsByClassName("en");for(let i=0;i<ens.length;i++)ens[i].style.fontSize=(17*fontScale)+"px";
+const zhs=document.getElementsByClassName("zh");for(let i=0;i<zhs.length;i++)zhs[i].style.fontSize=(21*fontScale)+"px";
+}
+fontUp.onclick=function(){fontScale=Math.min(2.5,fontScale+0.15);localStorage.setItem("fontScale",fontScale);applyFont();};
+fontDown.onclick=function(){fontScale=Math.max(0.6,fontScale-0.15);localStorage.setItem("fontScale",fontScale);applyFont();};
+applyFont();
+exportBtn.onclick=function(){
+const items=hist.getElementsByClassName("item");
+if(!items.length){alert("还没有内容可导出");return;}
+let txt="";
+for(let i=items.length-1;i>=0;i--){
+const en=items[i].querySelector(".en").textContent;
+const zh=items[i].querySelector(".zh").textContent;
+txt+=en+"\n"+zh+"\n\n";
+}
+const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+const a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+const d=new Date();
+a.download="讲座记录_"+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"_"+d.getHours()+"."+d.getMinutes()+".txt";
+a.click();
+};
+spkBtn.onclick=function(){
+if(run){alert("请先点【停止】，再切换分人模式（切换后重新点开始生效）");return;}
+diarize=!diarize;
+spkBtn.textContent=diarize?"👤 分人：开":"👤 分人：关";
+};startBtn.onclick=async function(){
+if(run)return;
+try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}});}
+catch(e){st("麦克风失败");alert(e.message);return;}
+ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+src=ac.createMediaStreamSource(stream);
+proc=ac.createScriptProcessor(4096,1,1);
+src.connect(proc);proc.connect(ac.destination);
+let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1";
+if(diarize)url+="&diarize=true";
+st(diarize?"连接中(分人开)...":"连接中...");
+ws=new WebSocket(url,["token",DG]);
+ws.onopen=function(){
+run=true;st(diarize?"🎤 识别中(分人开)":"🎤 识别中");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;
+proc.onaudioprocess=function(e){
+if(!run||ws.readyState!==1)return;
+const a=e.inputBuffer.getChannelData(0);
+const p=new Int16Array(a.length);
+for(let i=0;i<a.length;i++){let s=Math.max(-1,Math.min(1,a[i]));p[i]=s<0?s*0x8000:s*0x7FFF;}
+ws.send(p.buffer);
+};
+};
+ws.onmessage=function(ev){
+let m;try{m=JSON.parse(ev.data);}catch(e){return;}
+if(m.type==="UtteranceEnd"){flush();return;}
+if(m.type==="Results"){
+const al=m.channel&&m.channel.alternatives&&m.channel.alternatives[0];
+if(!al||!al.transcript)return;
+const tx=al.transcript;
+if(m.is_final){
+buf=(buf+" "+tx).trim();
+if(diarize&&al.words&&al.words.length){for(let i=0;i<al.words.length;i++){bufWords.push(al.words[i].speaker||0);}}
+splitSentences();
+liveEn.textContent=buf;
+if(m.speech_final)flush();
+}else{
+liveEn.textContent=(buf+" "+tx).trim();
+}
+}
+};
+ws.onerror=function(){st("WebSocket错误");};
+ws.onclose=function(){if(run)st("连接断开");clean();};
+};
+stopBtn.onclick=function(){
+run=false;flush();
+if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({type:"CloseStream"}));}catch(e){}ws.close();}
+clean();st("已停止");startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false;
+};
+function majoritySpeakerOf(start,count){
+const cnt={};let best=0,bestN=-1;
+for(let i=start;i<start+count&&i<bufWords.length;i++){const s=bufWords[i];cnt[s]=(cnt[s]||0)+1;if(cnt[s]>bestN){bestN=cnt[s];best=s;}}
+return best;
+}
+function splitSentences(){
+const re=/[^.?!]*[.?!]+/g;
+let m,last=0,emitted=false;
+while((m=re.exec(buf))!==null){
+const s=m[0].trim();
+if(s){
+const wc=s.split(/\s+/).length;
+const segSpk=diarize?majoritySpeakerOf(0,wc):-1;
+archive(s,segSpk);
+if(diarize)bufWords.splice(0,wc);
+emitted=true;
+}
+last=re.lastIndex;
+}
+if(emitted){buf=buf.slice(last).trim();liveEn.textContent=buf;liveZh.textContent="";}
+}
+function flush(){
+const s=buf.trim();
+const spk=diarize?majoritySpeakerOf(0,bufWords.length):-1;
+buf="";bufWords=[];liveEn.textContent="";liveZh.textContent="";
+if(s)archive(s,spk);
+}
+function clean(){
+try{if(proc){proc.disconnect();proc.onaudioprocess=null;}}catch(e){}
+try{if(src)src.disconnect();}catch(e){}
+try{if(ac)ac.close();}catch(e){}
+try{if(stream)stream.getTracks().forEach(t=>t.stop());}catch(e){}
+startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false;
+}
+function archive(en,spk){
+const d=document.createElement("div");d.className="item";
+let tag="";
+if(spk>=0)tag='<span class="spk" style="background:'+spkColor(spk)+'">说话人 '+(spk+1)+'</span>';
+d.innerHTML=tag+'<div class="en"></div><div class="zh">翻译中...</div>';
+const enEl=d.querySelector(".en"),zhEl=d.querySelector(".zh");
+enEl.textContent=en;
+enEl.style.fontSize=(17*fontScale)+"px";
+zhEl.style.fontSize=(21*fontScale)+"px";
+hist.insertBefore(d,hist.firstChild);
+while(hist.children.length>MAX_ITEMS)hist.removeChild(hist.lastChild);
+translateRetry(en,zhEl,2);
+}
+function translateRetry(text,el,tries){
+translate(text).then(function(o){el.textContent=o;}).catch(function(){
+if(tries>0){setTimeout(function(){translateRetry(text,el,tries-1);},800);}
+else{el.textContent="[翻译失败]";}
+});
+}
+async function translate(text){
+const r=await fetch("https://api.deepseek.com/chat/completions",{
+method:"POST",
+headers:{"Content-Type":"application/json","Authorization":"Bearer "+DS},
+body:JSON.stringify({model:"deepseek-v4-flash",messages:[{role:"system",content:"你是专业学术讲座翻译。把英文准确通顺地翻成中文，只输出中文译文，不要解释、不要原文。"},{role:"user",content:text}],temperature:0.3})
+});
+if(!r.ok)throw new Error("HTTP "+r.status);
+const j=await r.json();
+return j.choices[0].message.content.trim();
+}
+</script>
+</body>
+</html>
+
+
