@@ -83,7 +83,7 @@ if(ac.state==="suspended")await ac.resume();
 src=ac.createMediaStreamSource(stream);
 proc=ac.createScriptProcessor(4096,1,1);
 src.connect(proc);proc.connect(ac.destination);
-let url="wss://translator-api.xyy3041964059.workers.dev/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
+let url="wss://plush-stork-8356.xyy3041964059.deno.net/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
 if(diarize)url+="&diarize=true";
 st(diarize?"连接中(分人开)...":"连接中...");
 ws=new WebSocket(url);
