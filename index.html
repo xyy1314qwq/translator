@@ -6,20 +6,31 @@
 <title>讲座翻译</title>
 <style>
 body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3}
-#bar{position:sticky;top:0;background:#161b22;padding:12px;border-bottom:1px solid #30363d;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-button{font-size:15px;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+#bar{position:sticky;top:0;background:#161b22;padding:10px;border-bottom:1px solid #30363d;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+button{font-size:14px;padding:7px 12px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
 #startBtn{background:#238636;color:#fff}#stopBtn{background:#da3633;color:#fff}
-.gray{background:#30363d;color:#fff;font-size:14px;padding:8px 14px}
+.gray{background:#30363d;color:#fff;font-size:13px;padding:6px 10px}
+.glossary-active{background:#9e6a03;color:#fff;font-size:13px;padding:6px 10px}
 button:disabled{opacity:.4}
-#status{font-size:14px;color:#8b949e}
-#live{padding:18px;min-height:70px;border-bottom:3px solid #30363d;background:#11161c}
-#liveEn{color:#58a6ff;line-height:1.5}
-#liveZh{color:#fff;font-weight:bold;margin-top:6px;line-height:1.5}
-#hist{padding:18px}
-.item{margin-bottom:16px;padding:12px;border-radius:8px;background:#161b22}
+#status{font-size:13px;color:#8b949e;flex:1;text-align:right}
+#live{padding:16px;min-height:60px;border-bottom:3px solid #30363d;background:#11161c}
+#liveEn{color:#58a6ff;line-height:1.5;word-break:break-all}
+#liveZh{color:#fff;font-weight:bold;margin-top:4px;line-height:1.5}
+#hist{padding:16px}
+.item{margin-bottom:14px;padding:12px;border-radius:8px;background:#161b22}
 .spk{font-size:13px;font-weight:bold;padding:2px 8px;border-radius:6px;color:#fff;margin-bottom:6px;display:inline-block}
-.en{color:#7d8590;line-height:1.5}
+.en{color:#7d8590;line-height:1.5;word-break:break-word}
 .zh{color:#fff;font-weight:bold;margin-top:6px;line-height:1.5}
+#glossaryOverlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99;justify-content:center;align-items:center}
+#glossaryOverlay.show{display:flex}
+#glossaryBox{background:#161b22;border-radius:12px;padding:20px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column}
+#glossaryBox h3{margin:0 0 6px;color:#e6edf3;font-size:16px}
+#glossaryBox p{font-size:12px;color:#8b949e;margin:0 0 10px}
+#glossaryTextarea{flex:1;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:10px;font-family:monospace;font-size:13px;resize:none;min-height:100px}
+#glossaryActions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+#glossaryActions button{padding:7px 16px}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
 </style>
 </head>
 <body>
@@ -27,6 +38,7 @@ button:disabled{opacity:.4}
 <button id="startBtn">▶ 开始</button>
 <button id="stopBtn" disabled>■ 停止</button>
 <button id="spkBtn" class="gray">👤 分人：关</button>
+<button id="glossaryBtn" class="gray">📖 词库</button>
 <button id="fontDown" class="gray">A−</button>
 <button id="fontUp" class="gray">A+</button>
 <button id="exportBtn" class="gray">💾 导出</button>
@@ -34,14 +46,68 @@ button:disabled{opacity:.4}
 </div>
 <div id="live"><div id="liveEn"></div><div id="liveZh"></div></div>
 <div id="hist"></div>
+
+<div id="glossaryOverlay">
+<div id="glossaryBox">
+<h3>📖 术语词库</h3>
+<p>每行一个术语：英文=中文</p>
+<textarea id="glossaryTextarea" placeholder="deep learning=深度学习&#10;hypothalamic-pituitary-adrenal axis=下丘脑-垂体-肾上腺轴"></textarea>
+<div id="glossaryActions">
+<button id="glossaryClear" class="gray">清空</button>
+<button id="glossarySave" style="background:#238636;color:#fff">保存</button>
+</div>
+</div>
+</div>
+
 <script>
 const $=function(id){return document.getElementById(id)};
-const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn");
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn"),glossaryBtn=$("glossaryBtn");
+const glossaryOverlay=$("glossaryOverlay"),glossaryTextarea=$("glossaryTextarea"),glossarySave=$("glossarySave"),glossaryClear=$("glossaryClear");
 let ws,ac,proc,src,stream,run=false;
 let buf="",bufWords=[],diarize=false;
+let glossary=localStorage.getItem("glossary")||"";
 let fontScale=parseFloat(localStorage.getItem("fontScale")||"1");
+if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="📖 词库✓";}
 const MAX_ITEMS=200;
+const MAX_CHARS=500;
 const COLORS=["#1f6feb","#238636","#9e6a03","#a371f7","#bf3989","#1b7c83","#da3633"];
+
+// 语气词集合
+const FILLERS=new Set([
+"fuck","fk","fck","shit","damn","crap","bitch",
+"yeah","yep","yes","yup","no","nope","nah",
+"okay","ok","k","alright","all right","alrighty","okey","okie",
+"um","uh","ah","oh","hmm","huh","hm","mm","mmm","ugh","er","eh","aha",
+"well","so","right","really","actually","basically","anyway","anyways","anyhow",
+"hey","hi","hello","wow","oops","whoa",
+"like","just","i see","you know","i mean","you see",
+"of course","sure","certainly","indeed",
+"thanks","thank you","please",
+"great","good","fine","nice","cool","awesome",
+"sorry","excuse me",
+"btw","lol","omg","lmao","so anyway","anyway so"
+]);
+function isFiller(t){
+const s=t.trim().toLowerCase().replace(/[,;:'"!]+$/,"").replace(/^[,;:'"]+/,"");
+const words=s.split(/\s+/);
+if(words.length>3)return false;
+return FILLERS.has(s.replace(/[.?!]+$/,""));
+}
+let pendingFiller="";
+
+// 词库弹窗
+glossaryTextarea.value=glossary;
+glossaryBtn.onclick=function(){glossaryOverlay.classList.add("show");glossaryTextarea.focus();};
+glossaryOverlay.onclick=function(e){if(e.target===glossaryOverlay)glossaryOverlay.classList.remove("show");};
+glossarySave.onclick=function(){
+glossary=glossaryTextarea.value.trim();
+localStorage.setItem("glossary",glossary);
+if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="📖 词库✓";}
+else{glossaryBtn.className="gray";glossaryBtn.textContent="📖 词库";}
+glossaryOverlay.classList.remove("show");
+};
+glossaryClear.onclick=function(){glossaryTextarea.value="";};
+
 function st(t){statusEl.textContent=t}
 function spkColor(n){return COLORS[n%COLORS.length]}
 function applyFont(){
@@ -106,8 +172,8 @@ if(!al||!al.transcript)return;
 const tx=al.transcript;
 if(m.is_final){
 buf=(buf+" "+tx).trim();
-if(diarize&&al.words&&al.words.length){for(let i=0;i<al.words.length;i++){bufWords.push(al.words[i].speaker||0);}}
-splitSentences();
+if(diarize&&al.words&&al.words.length){for(let i=0;i<al.words.length;i++)bufWords.push(al.words[i].speaker||0);}
+splitSentencesBuf();
 liveEn.textContent=buf;
 if(m.speech_final)flush();
 }else{
@@ -128,27 +194,71 @@ const cnt={};let best=0,bestN=-1;
 for(let i=start;i<start+count&&i<bufWords.length;i++){const s=bufWords[i];cnt[s]=(cnt[s]||0)+1;if(cnt[s]>bestN){bestN=cnt[s];best=s;}}
 return best;
 }
-function splitSentences(){
+
+// 智能切句：语气词合并 + 长句分割
+function splitSentencesBuf(){
 const re=/[^.?!]*[.?!]+/g;
 let m,last=0,emitted=false;
 while((m=re.exec(buf))!==null){
 const s=m[0].trim();
 if(s){
-const wc=s.split(/\s+/).length;
-const segSpk=diarize?majoritySpeakerOf(0,wc):-1;
-archive(s,segSpk);
-if(diarize)bufWords.splice(0,wc);
+if(isFiller(s)){
+pendingFiller+=(pendingFiller?" ":"")+s;
 emitted=true;
+}else{
+let final=pendingFiller?pendingFiller+" "+s:s;
+pendingFiller="";
+emitted=true;
+chunkAndArchive(final);
+}
 }
 last=re.lastIndex;
 }
 if(emitted){buf=buf.slice(last).trim();liveEn.textContent=buf;liveZh.textContent="";}
 }
+
+// 长句分割翻译
+function chunkAndArchive(text){
+const parts=smartChunk(text,MAX_CHARS);
+for(let i=0;i<parts.length;i++){
+const part=parts[i].trim();
+if(!part)continue;
+const wc=part.split(/\s+/).length;
+const segSpk=diarize&&i===0?majoritySpeakerOf(0,wc):(diarize?majoritySpeakerOf(0,wc):-1);
+if(diarize&&i===0)bufWords.splice(0,wc);
+archive(part,segSpk);
+}
+}
+
+function smartChunk(text,maxLen){
+if(text.length<=maxLen)return[text];
+const sentences=text.match(/[^.!?]*[.!?]+/g)||[text];
+const chunks=[];
+let cur="";
+for(const s of sentences){
+if(cur&&(cur+s).length>maxLen){
+chunks.push(cur.trim());
+cur=s;
+}else{
+cur+=s;
+}
+}
+if(cur.trim())chunks.push(cur.trim());
+if(chunks.length===0)chunks.push(text);
+return chunks;
+}
+
 function flush(){
-const s=buf.trim();
-const spk=diarize?majoritySpeakerOf(0,bufWords.length):-1;
-buf="";bufWords=[];liveEn.textContent="";liveZh.textContent="";
-if(s)archive(s,spk);
+let s=buf.trim();
+if(pendingFiller){
+s=pendingFiller+" "+s;
+pendingFiller="";
+}
+buf="";liveEn.textContent="";liveZh.textContent="";
+if(s.trim()){
+chunkAndArchive(s.trim());
+bufWords=[];
+}
 }
 function clean(){
 try{if(proc){proc.disconnect();proc.onaudioprocess=null;}}catch(e){}
@@ -161,7 +271,7 @@ function archive(en,spk){
 const d=document.createElement("div");d.className="item";
 let tag="";
 if(spk>=0)tag='<span class="spk" style="background:'+spkColor(spk)+'">说话人 '+(spk+1)+'</span>';
-d.innerHTML=tag+'<div class="en"></div><div class="zh">翻译中...</div>';
+d.innerHTML=tag+'<div class="en"></div><div class="zh"><span class="spinner"></span>翻译中...</div>';
 const enEl=d.querySelector(".en"),zhEl=d.querySelector(".zh");
 enEl.textContent=en;
 enEl.style.fontSize=(17*fontScale)+"px";
@@ -171,18 +281,18 @@ while(hist.children.length>MAX_ITEMS)hist.removeChild(hist.lastChild);
 translateRetry(en,zhEl,2);
 }
 function translateRetry(text,el,tries){
-translate(text).then(function(o){el.textContent=o;}).catch(function(){
+translate(text).then(function(o){el.innerHTML=o;}).catch(function(){
 if(tries>0){setTimeout(function(){translateRetry(text,el,tries-1);},800);}
-else{el.textContent="[翻译失败]";}
+else{el.innerHTML="[翻译失败]";}
 });
 }
 async function translate(text){
 const r=await fetch("https://translator-api.xyy3041964059.workers.dev",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({text:text})
+body:JSON.stringify({text:text,glossary:glossary})
 });
-if(!r.ok)throw new Error("HTTP "+r.status);
+if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"HTTP "+r.status);}
 const j=await r.json();
 return j.translation;
 }
