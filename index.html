@@ -58,14 +58,73 @@ button:disabled{opacity:.4}
 </div>
 </div>
 </div>
-
 <script>
 const $=function(id){return document.getElementById(id)};
 const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn"),glossaryBtn=$("glossaryBtn");
 const glossaryOverlay=$("glossaryOverlay"),glossaryTextarea=$("glossaryTextarea"),glossarySave=$("glossarySave"),glossaryClear=$("glossaryClear");
 let ws,ac,proc,src,stream,run=false;
 let buf="",bufWords=[],diarize=false;
-let glossary=localStorage.getItem("glossary")||"";
+const DEFAULT_GLOSSARY=[
+  // ---- 学术基础 ----
+  "academic integrity=学术诚信",
+  "plagiarism=抄袭",
+  "peer review=同行评审",
+  "citation=引用",
+  "methodology=研究方法",
+  // ---- 学术与专业沟通 ----
+  "rhetoric=修辞学",
+  "stakeholder=利益相关者",
+  "presentation skills=演讲技巧",
+  // ---- 设计计算 ----
+  "user interface=用户界面",
+  "user experience=用户体验",
+  "prototype=原型",
+  "responsive design=响应式设计",
+  "typography=字体排印",
+  // ---- 屏幕实践 ----
+  "cinematography=电影摄影",
+  "storyboard=分镜脚本",
+  "post-production=后期制作",
+  "narrative structure=叙事结构",
+  // ---- 媒体研究 ----
+  "media literacy=媒介素养",
+  "digital media=数字媒体",
+  "semiotics=符号学",
+  "representation=表征",
+  "user-generated content=用户生成内容",
+  // ---- Adobe 全家桶 ----
+  "layer=图层",
+  "mask=蒙版",
+  "opacity=不透明度",
+  "blending mode=混合模式",
+  "filter=滤镜",
+  "smart object=智能对象",
+  "resolution=分辨率",
+  "pixel=像素",
+  "vector=矢量",
+  "path=路径",
+  "anchor point=锚点",
+  "artboard=画板",
+  "stroke=描边",
+  "fill=填充",
+  "gradient=渐变",
+  "timeline=时间线",
+  "keyframe=关键帧",
+  "transition=转场",
+  "render=渲染",
+  "export=导出",
+  "composition=合成",
+  "motion graphics=动态图形",
+  "visual effects=视觉特效",
+  "green screen=绿幕",
+  "layout=版面布局",
+  "bleed=出血",
+  "margin=页边距",
+  "asset=素材",
+  "workflow=工作流程"
+].join("\n");
+
+let glossary=localStorage.getItem("glossary")||DEFAULT_GLOSSARY;
 let fontScale=parseFloat(localStorage.getItem("fontScale")||"1");
 if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="📖 词库✓";}
 const MAX_ITEMS=200;
