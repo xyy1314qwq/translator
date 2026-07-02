@@ -1,360 +1,140 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>讲座翻译</title>
+<title>课堂实时翻译</title>
 <style>
-body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3}
-#bar{position:sticky;top:0;background:#161b22;padding:10px;border-bottom:1px solid #30363d;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+:root{color-scheme:dark;--bg:#0d1117;--panel:#161b22;--panel2:#11161c;--line:#30363d;--text:#e6edf3;--muted:#8b949e;--blue:#58a6ff;--green:#238636;--red:#da3633;--gold:#9e6a03}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei","Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+#bar{position:sticky;top:0;z-index:5;background:var(--panel);padding:10px;border-bottom:1px solid var(--line);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 button{font-size:14px;padding:7px 12px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
-#startBtn{background:#238636;color:#fff}#stopBtn{background:#da3633;color:#fff}
+#startBtn{background:var(--green);color:#fff}#stopBtn{background:var(--red);color:#fff}
 .gray{background:#30363d;color:#fff;font-size:13px;padding:6px 10px}
-.glossary-active{background:#9e6a03;color:#fff;font-size:13px;padding:6px 10px}
-button:disabled{opacity:.4}
-#status{font-size:13px;color:#8b949e;flex:1;text-align:right}
-#live{padding:16px;min-height:60px;border-bottom:3px solid #30363d;background:#11161c}
-#liveEn{color:#58a6ff;line-height:1.5;word-break:break-all}
+.glossary-active{background:var(--gold);color:#fff;font-size:13px;padding:6px 10px}
+button:disabled{opacity:.4;cursor:not-allowed}
+#status{font-size:13px;color:var(--muted);flex:1;text-align:right;min-width:160px}
+#live{padding:16px;min-height:72px;border-bottom:3px solid var(--line);background:var(--panel2)}
+#liveEn{color:var(--blue);line-height:1.5;word-break:break-word}
 #liveZh{color:#fff;font-weight:bold;margin-top:4px;line-height:1.5}
 #hist{padding:16px}
-.item{margin-bottom:14px;padding:12px;border-radius:8px;background:#161b22}
+.item{margin-bottom:14px;padding:12px;border-radius:8px;background:var(--panel)}
 .spk{font-size:13px;font-weight:bold;padding:2px 8px;border-radius:6px;color:#fff;margin-bottom:6px;display:inline-block}
 .en{color:#7d8590;line-height:1.5;word-break:break-word}
 .zh{color:#fff;font-weight:bold;margin-top:6px;line-height:1.5}
-#glossaryOverlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99;justify-content:center;align-items:center}
-#glossaryOverlay.show{display:flex}
-#glossaryBox{background:#161b22;border-radius:12px;padding:20px;width:90%;max-width:500px;max-height:80vh;display:flex;flex-direction:column}
-#glossaryBox h3{margin:0 0 6px;color:#e6edf3;font-size:16px}
-#glossaryBox p{font-size:12px;color:#8b949e;margin:0 0 10px}
-#glossaryTextarea{flex:1;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:10px;font-family:monospace;font-size:13px;resize:none;min-height:100px}
-#glossaryActions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
-#glossaryActions button{padding:7px 16px}
+#glossaryOverlay,#settingsOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:99;justify-content:center;align-items:center;padding:16px}
+#glossaryOverlay.show,#settingsOverlay.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:560px;max-height:84vh;display:flex;flex-direction:column}
+.modal h3{margin:0 0 6px;color:var(--text);font-size:16px}
+.modal p{font-size:12px;color:var(--muted);margin:0 0 10px}
+textarea,input,select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:10px;font-family:inherit;font-size:13px}
+textarea{resize:vertical;min-height:160px;font-family:Consolas,monospace}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+.actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+.actions button{padding:7px 16px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
 </style>
 </head>
 <body>
 <div id="bar">
-<button id="startBtn">▶ 开始</button>
-<button id="stopBtn" disabled>■ 停止</button>
-<button id="spkBtn" class="gray">👤 分人：关</button>
-<button id="glossaryBtn" class="gray">📖 词库</button>
-<button id="fontDown" class="gray">A−</button>
+<button id="startBtn">开始</button>
+<button id="stopBtn" disabled>停止</button>
+<button id="spkBtn" class="gray">分人：关</button>
+<button id="glossaryBtn" class="gray">术语库</button>
+<button id="settingsBtn" class="gray">设置</button>
+<button id="fontDown" class="gray">A-</button>
 <button id="fontUp" class="gray">A+</button>
-<button id="exportBtn" class="gray">💾 导出</button>
+<button id="exportBtn" class="gray">导出</button>
 <span id="status">未开始</span>
 </div>
 <div id="live"><div id="liveEn"></div><div id="liveZh"></div></div>
 <div id="hist"></div>
 
 <div id="glossaryOverlay">
-<div id="glossaryBox">
-<h3>📖 术语词库</h3>
-<p>每行一个术语：英文=中文</p>
-<textarea id="glossaryTextarea" placeholder="deep learning=深度学习&#10;hypothalamic-pituitary-adrenal axis=下丘脑-垂体-肾上腺轴"></textarea>
-<div id="glossaryActions">
+<div class="modal">
+<h3>术语库</h3>
+<p>每行一个术语：英文=中文。翻译时会连同上下文发给 Worker。</p>
+<textarea id="glossaryTextarea" spellcheck="false"></textarea>
+<div class="actions">
 <button id="glossaryClear" class="gray">清空</button>
 <button id="glossarySave" style="background:#238636;color:#fff">保存</button>
 </div>
 </div>
 </div>
-<script>
-const $=function(id){return document.getElementById(id)};
-const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn"),glossaryBtn=$("glossaryBtn");
-const glossaryOverlay=$("glossaryOverlay"),glossaryTextarea=$("glossaryTextarea"),glossarySave=$("glossarySave"),glossaryClear=$("glossaryClear");
-let ws,ac,proc,src,stream,run=false;
-let buf="",bufWords=[],diarize=false;
-const DEFAULT_GLOSSARY=[
-  // ---- 学术基础 ----
-  "academic integrity=学术诚信",
-  "plagiarism=抄袭",
-  "peer review=同行评审",
-  "citation=引用",
-  "methodology=研究方法",
-  // ---- 学术与专业沟通 ----
-  "rhetoric=修辞学",
-  "stakeholder=利益相关者",
-  "presentation skills=演讲技巧",
-  // ---- 设计计算 ----
-  "user interface=用户界面",
-  "user experience=用户体验",
-  "prototype=原型",
-  "responsive design=响应式设计",
-  "typography=字体排印",
-  // ---- 屏幕实践 ----
-  "cinematography=电影摄影",
-  "storyboard=分镜脚本",
-  "post-production=后期制作",
-  "narrative structure=叙事结构",
-  // ---- 媒体研究 ----
-  "media literacy=媒介素养",
-  "digital media=数字媒体",
-  "semiotics=符号学",
-  "representation=表征",
-  "user-generated content=用户生成内容",
-  // ---- Adobe 全家桶 ----
-  "layer=图层",
-  "mask=蒙版",
-  "opacity=不透明度",
-  "blending mode=混合模式",
-  "filter=滤镜",
-  "smart object=智能对象",
-  "resolution=分辨率",
-  "pixel=像素",
-  "vector=矢量",
-  "path=路径",
-  "anchor point=锚点",
-  "artboard=画板",
-  "stroke=描边",
-  "fill=填充",
-  "gradient=渐变",
-  "timeline=时间线",
-  "keyframe=关键帧",
-  "transition=转场",
-  "render=渲染",
-  "export=导出",
-  "composition=合成",
-  "motion graphics=动态图形",
-  "visual effects=视觉特效",
-  "green screen=绿幕",
-  "layout=版面布局",
-  "bleed=出血",
-  "margin=页边距",
-  "asset=素材",
-  "workflow=工作流程"
-].join("\n");
 
+<div id="settingsOverlay">
+<div class="modal">
+<h3>翻译设置</h3>
+<p>翻译慢一点但句子更完整，通常比碎片化实时翻译更准。</p>
+<label for="apiInput">翻译 Worker 地址</label>
+<input id="apiInput" type="url">
+<label for="modeSelect">翻译风格</label>
+<select id="modeSelect">
+<option value="lecture">课堂字幕：自然、准确、适合阅读</option>
+<option value="literal">忠实直译：尽量保留原句结构</option>
+<option value="notes">复习笔记：整理成更清楚的中文</option>
+</select>
+<label for="courseInput">课程/领域提示</label>
+<input id="courseInput" placeholder="例如：传媒研究、设计软件、计算机科学">
+<div class="actions">
+<button id="settingsCancel" class="gray">取消</button>
+<button id="settingsSave" style="background:#238636;color:#fff">保存</button>
+</div>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn"),glossaryBtn=$("glossaryBtn"),settingsBtn=$("settingsBtn");
+const glossaryOverlay=$("glossaryOverlay"),glossaryTextarea=$("glossaryTextarea"),glossarySave=$("glossarySave"),glossaryClear=$("glossaryClear");
+const settingsOverlay=$("settingsOverlay"),apiInput=$("apiInput"),modeSelect=$("modeSelect"),courseInput=$("courseInput"),settingsSave=$("settingsSave"),settingsCancel=$("settingsCancel");
+const DEFAULT_API="https://translator-api.xyy3041964059.workers.dev";
+const DEFAULT_GLOSSARY=[
+"academic integrity=学术诚信","plagiarism=抄袭","peer review=同行评审","citation=引用","methodology=研究方法","rhetoric=修辞学","stakeholder=利益相关者","presentation skills=演讲技巧","user interface=用户界面","user experience=用户体验","prototype=原型","responsive design=响应式设计","typography=字体排印","cinematography=电影摄影","storyboard=分镜脚本","post-production=后期制作","narrative structure=叙事结构","media literacy=媒介素养","digital media=数字媒体","semiotics=符号学","representation=表征","user-generated content=用户生成内容","layer=图层","mask=蒙版","opacity=不透明度","blending mode=混合模式","filter=滤镜","smart object=智能对象","resolution=分辨率","pixel=像素","vector=矢量","path=路径","anchor point=锚点","artboard=画板","stroke=描边","fill=填充","gradient=渐变","timeline=时间线","keyframe=关键帧","transition=转场","render=渲染","export=导出","composition=合成","motion graphics=动态图形","visual effects=视觉特效","green screen=绿幕","layout=版面布局","bleed=出血","margin=页边距","asset=素材","workflow=工作流"
+].join("\n");
+let ws,ac,proc,src,stream,run=false;
+let buf="",bufWords=[],diarize=false,pendingFiller="";
 let glossary=localStorage.getItem("glossary")||DEFAULT_GLOSSARY;
 let fontScale=parseFloat(localStorage.getItem("fontScale")||"1");
-if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="📖 词库✓";}
-const MAX_ITEMS=200;
-const MAX_CHARS=500;
+let apiUrl=localStorage.getItem("apiUrl")||DEFAULT_API;
+let mode=localStorage.getItem("translationMode")||"lecture";
+let courseHint=localStorage.getItem("courseHint")||"";
+let contextHistory=[];
+const CONTEXT_LIMIT=5,MAX_ITEMS=200,MAX_CHARS=420;
 const COLORS=["#1f6feb","#238636","#9e6a03","#a371f7","#bf3989","#1b7c83","#da3633"];
-
-// 语气词集合
-const FILLERS=new Set([
-"fuck","fk","fck","shit","damn","crap","bitch",
-"yeah","yep","yes","yup","no","nope","nah",
-"okay","ok","k","alright","all right","alrighty","okey","okie",
-"um","uh","ah","oh","hmm","huh","hm","mm","mmm","ugh","er","eh","aha",
-"well","so","right","really","actually","basically","anyway","anyways","anyhow",
-"hey","hi","hello","wow","oops","whoa",
-"like","just","i see","you know","i mean","you see",
-"of course","sure","certainly","indeed",
-"thanks","thank you","please",
-"great","good","fine","nice","cool","awesome",
-"sorry","excuse me",
-"btw","lol","omg","lmao","so anyway","anyway so"
-]);
-function isFiller(t){
-const s=t.trim().toLowerCase().replace(/[,;:'"!]+$/,"").replace(/^[,;:'"]+/,"");
-const words=s.split(/\s+/);
-if(words.length>3)return false;
-return FILLERS.has(s.replace(/[.?!]+$/,""));
-}
-let pendingFiller="";
-
-// 词库弹窗
-glossaryTextarea.value=glossary;
-glossaryBtn.onclick=function(){glossaryOverlay.classList.add("show");glossaryTextarea.focus();};
-glossaryOverlay.onclick=function(e){if(e.target===glossaryOverlay)glossaryOverlay.classList.remove("show");};
-glossarySave.onclick=function(){
-glossary=glossaryTextarea.value.trim();
-localStorage.setItem("glossary",glossary);
-if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="📖 词库✓";}
-else{glossaryBtn.className="gray";glossaryBtn.textContent="📖 词库";}
-glossaryOverlay.classList.remove("show");
-};
-glossaryClear.onclick=function(){glossaryTextarea.value="";};
-
+const FILLERS=new Set(["fuck","fk","fck","shit","damn","crap","yeah","yep","yes","yup","no","nope","nah","okay","ok","alright","all right","um","uh","ah","oh","hmm","huh","well","so","right","actually","basically","anyway","hey","hi","hello","wow","like","just","you know","i mean","of course","sure","thanks","thank you","please","sorry","excuse me"]);
 function st(t){statusEl.textContent=t}
 function spkColor(n){return COLORS[n%COLORS.length]}
-function applyFont(){
-liveEn.style.fontSize=(20*fontScale)+"px";
-liveZh.style.fontSize=(22*fontScale)+"px";
-const ens=document.getElementsByClassName("en");for(let i=0;i<ens.length;i++)ens[i].style.fontSize=(17*fontScale)+"px";
-const zhs=document.getElementsByClassName("zh");for(let i=0;i<zhs.length;i++)zhs[i].style.fontSize=(21*fontScale)+"px";
-}
-fontUp.onclick=function(){fontScale=Math.min(2.5,fontScale+0.15);localStorage.setItem("fontScale",fontScale);applyFont();};
-fontDown.onclick=function(){fontScale=Math.max(0.6,fontScale-0.15);localStorage.setItem("fontScale",fontScale);applyFont();};
-applyFont();
-exportBtn.onclick=function(){
-const items=hist.getElementsByClassName("item");
-if(!items.length){alert("还没有内容可导出");return;}
-let txt="";
-for(let i=items.length-1;i>=0;i--){
-const en=items[i].querySelector(".en").textContent;
-const zh=items[i].querySelector(".zh").textContent;
-txt+=en+"\n"+zh+"\n\n";
-}
-const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
-const a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-const d=new Date();
-a.download="讲座记录_"+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"_"+d.getHours()+"."+d.getMinutes()+".txt";
-a.click();
-};
-spkBtn.onclick=function(){
-if(run){alert("请先点【停止】，再切换分人模式（切换后重新点开始生效）");return;}
-diarize=!diarize;
-spkBtn.textContent=diarize?"👤 分人：开":"👤 分人：关";
-};
-startBtn.onclick=async function(){
-if(run)return;
-try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});}
-catch(e){st("麦克风失败");alert(e.message);return;}
-ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
-if(ac.state==="suspended")await ac.resume();
-src=ac.createMediaStreamSource(stream);
-proc=ac.createScriptProcessor(4096,1,1);
-src.connect(proc);proc.connect(ac.destination);
-let url="wss://plush-stork-8356.xyy3041964059.deno.net/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=800&utterance_end_ms=1500&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
-if(diarize)url+="&diarize=true";
-st(diarize?"连接中(分人开)...":"连接中...");
-ws=new WebSocket(url);
-ws.onopen=function(){
-run=true;st(diarize?"🎤 识别中(分人开)":"🎤 识别中");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;
-proc.onaudioprocess=function(e){
-if(!run||ws.readyState!==1)return;
-const a=e.inputBuffer.getChannelData(0);
-const p=new Int16Array(a.length);
-for(let i=0;i<a.length;i++){let s=Math.max(-1,Math.min(1,a[i]));p[i]=s<0?s*0x8000:s*0x7FFF;}
-ws.send(p.buffer);
-};
-};
-ws.onmessage=function(ev){
-let m;try{m=JSON.parse(ev.data);}catch(e){return;}
-if(m.type==="UtteranceEnd"){flush();return;}
-if(m.type==="Results"){
-const al=m.channel&&m.channel.alternatives&&m.channel.alternatives[0];
-if(!al||!al.transcript)return;
-const tx=al.transcript;
-if(m.is_final){
-buf=(buf+" "+tx).trim();
-if(diarize&&al.words&&al.words.length){for(let i=0;i<al.words.length;i++)bufWords.push(al.words[i].speaker||0);}
-splitSentencesBuf();
-liveEn.textContent=buf;
-if(m.speech_final)flush();
-}else{
-liveEn.textContent=(buf+" "+tx).trim();
-}
-}
-};
-ws.onerror=function(){st("WebSocket错误");};
-ws.onclose=function(){if(run)st("连接断开");clean();};
-};
-stopBtn.onclick=function(){
-run=false;flush();
-if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({type:"CloseStream"}));}catch(e){}ws.close();}
-clean();st("已停止");startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false;
-};
-function majoritySpeakerOf(start,count){
-const cnt={};let best=0,bestN=-1;
-for(let i=start;i<start+count&&i<bufWords.length;i++){const s=bufWords[i];cnt[s]=(cnt[s]||0)+1;if(cnt[s]>bestN){bestN=cnt[s];best=s;}}
-return best;
-}
-
-// 智能切句：语气词合并 + 长句分割
-function splitSentencesBuf(){
-const re=/[^.?!]*[.?!]+/g;
-let m,last=0,emitted=false;
-while((m=re.exec(buf))!==null){
-const s=m[0].trim();
-if(s){
-if(isFiller(s)){
-pendingFiller+=(pendingFiller?" ":"")+s;
-emitted=true;
-}else{
-let final=pendingFiller?pendingFiller+" "+s:s;
-pendingFiller="";
-emitted=true;
-chunkAndArchive(final);
-}
-}
-last=re.lastIndex;
-}
-if(emitted){buf=buf.slice(last).trim();liveEn.textContent=buf;liveZh.textContent="";}
-}
-
-// 长句分割翻译
-function chunkAndArchive(text){
-const parts=smartChunk(text,MAX_CHARS);
-for(let i=0;i<parts.length;i++){
-const part=parts[i].trim();
-if(!part)continue;
-const wc=part.split(/\s+/).length;
-const segSpk=diarize&&i===0?majoritySpeakerOf(0,wc):(diarize?majoritySpeakerOf(0,wc):-1);
-if(diarize&&i===0)bufWords.splice(0,wc);
-archive(part,segSpk);
-}
-}
-
-function smartChunk(text,maxLen){
-if(text.length<=maxLen)return[text];
-const sentences=text.match(/[^.!?]*[.!?]+/g)||[text];
-const chunks=[];
-let cur="";
-for(const s of sentences){
-if(cur&&(cur+s).length>maxLen){
-chunks.push(cur.trim());
-cur=s;
-}else{
-cur+=s;
-}
-}
-if(cur.trim())chunks.push(cur.trim());
-if(chunks.length===0)chunks.push(text);
-return chunks;
-}
-
-function flush(){
-let s=buf.trim();
-if(pendingFiller){
-s=pendingFiller+" "+s;
-pendingFiller="";
-}
-buf="";liveEn.textContent="";liveZh.textContent="";
-if(s.trim()){
-chunkAndArchive(s.trim());
-bufWords=[];
-}
-}
-function clean(){
-try{if(proc){proc.disconnect();proc.onaudioprocess=null;}}catch(e){}
-try{if(src)src.disconnect();}catch(e){}
-try{if(ac)ac.close();}catch(e){}
-try{if(stream)stream.getTracks().forEach(t=>t.stop());}catch(e){}
-startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false;
-}
-function archive(en,spk){
-const d=document.createElement("div");d.className="item";
-let tag="";
-if(spk>=0)tag='<span class="spk" style="background:'+spkColor(spk)+'">说话人 '+(spk+1)+'</span>';
-d.innerHTML=tag+'<div class="en"></div><div class="zh"><span class="spinner"></span>翻译中...</div>';
-const enEl=d.querySelector(".en"),zhEl=d.querySelector(".zh");
-enEl.textContent=en;
-enEl.style.fontSize=(17*fontScale)+"px";
-zhEl.style.fontSize=(21*fontScale)+"px";
-hist.insertBefore(d,hist.firstChild);
-while(hist.children.length>MAX_ITEMS)hist.removeChild(hist.lastChild);
-translateRetry(en,zhEl,2);
-}
-function translateRetry(text,el,tries){
-translate(text).then(function(o){el.innerHTML=o;}).catch(function(){
-if(tries>0){setTimeout(function(){translateRetry(text,el,tries-1);},800);}
-else{el.innerHTML="[翻译失败]";}
-});
-}
-async function translate(text){
-const r=await fetch("https://translator-api.xyy3041964059.workers.dev",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({text:text,glossary:glossary})
-});
-if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"HTTP "+r.status);}
-const j=await r.json();
-return j.translation;
-}
+function isFiller(t){const s=t.trim().toLowerCase().replace(/[,;:'"!]+$/,"").replace(/^[,;:'"]+/,"").replace(/[.?!]+$/,"");if(s.split(/\s+/).length>3)return false;return FILLERS.has(s)}
+function refreshGlossaryButton(){if(glossary){glossaryBtn.className="glossary-active";glossaryBtn.textContent="术语库✓"}else{glossaryBtn.className="gray";glossaryBtn.textContent="术语库"}}
+function applyFont(){liveEn.style.fontSize=(20*fontScale)+"px";liveZh.style.fontSize=(22*fontScale)+"px";document.querySelectorAll(".en").forEach(el=>el.style.fontSize=(17*fontScale)+"px");document.querySelectorAll(".zh").forEach(el=>el.style.fontSize=(21*fontScale)+"px")}
+function rememberContext(en,zh){contextHistory.push({en,zh});if(contextHistory.length>CONTEXT_LIMIT)contextHistory=contextHistory.slice(-CONTEXT_LIMIT)}
+glossaryTextarea.value=glossary;apiInput.value=apiUrl;modeSelect.value=mode;courseInput.value=courseHint;refreshGlossaryButton();applyFont();
+glossaryBtn.onclick=()=>{glossaryOverlay.classList.add("show");glossaryTextarea.focus()};
+glossaryOverlay.onclick=e=>{if(e.target===glossaryOverlay)glossaryOverlay.classList.remove("show")};
+glossarySave.onclick=()=>{glossary=glossaryTextarea.value.trim();localStorage.setItem("glossary",glossary);refreshGlossaryButton();glossaryOverlay.classList.remove("show")};
+glossaryClear.onclick=()=>{glossaryTextarea.value=""};
+settingsBtn.onclick=()=>{apiInput.value=apiUrl;modeSelect.value=mode;courseInput.value=courseHint;settingsOverlay.classList.add("show")};
+settingsOverlay.onclick=e=>{if(e.target===settingsOverlay)settingsOverlay.classList.remove("show")};
+settingsCancel.onclick=()=>settingsOverlay.classList.remove("show");
+settingsSave.onclick=()=>{apiUrl=apiInput.value.trim()||DEFAULT_API;mode=modeSelect.value;courseHint=courseInput.value.trim();localStorage.setItem("apiUrl",apiUrl);localStorage.setItem("translationMode",mode);localStorage.setItem("courseHint",courseHint);settingsOverlay.classList.remove("show")};
+fontUp.onclick=()=>{fontScale=Math.min(2.5,fontScale+0.15);localStorage.setItem("fontScale",fontScale);applyFont()};
+fontDown.onclick=()=>{fontScale=Math.max(0.6,fontScale-0.15);localStorage.setItem("fontScale",fontScale);applyFont()};
+exportBtn.onclick=()=>{const items=hist.getElementsByClassName("item");if(!items.length){alert("还没有内容可导出");return}let txt="";for(let i=items.length-1;i>=0;i--){txt+=items[i].querySelector(".en").textContent+"\n"+items[i].querySelector(".zh").textContent+"\n\n"}const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);const d=new Date();a.download=`课堂记录_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}_${d.getHours()}.${d.getMinutes()}.txt`;a.click()};
+spkBtn.onclick=()=>{if(run){alert("请先停止识别，再切换分人模式。");return}diarize=!diarize;spkBtn.textContent=diarize?"分人：开":"分人：关"};
+startBtn.onclick=async()=>{if(run)return;try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){st("麦克风失败");alert(e.message);return}ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});if(ac.state==="suspended")await ac.resume();src=ac.createMediaStreamSource(stream);proc=ac.createScriptProcessor(4096,1,1);src.connect(proc);proc.connect(ac.destination);let url="wss://plush-stork-8356.xyy3041964059.deno.net/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=1400&utterance_end_ms=2200&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";if(diarize)url+="&diarize=true";st(diarize?"连接中（分人开）...":"连接中...");ws=new WebSocket(url);ws.onopen=()=>{run=true;st(diarize?"正在识别（分人开）":"正在识别");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;proc.onaudioprocess=e=>{if(!run||ws.readyState!==1)return;const a=e.inputBuffer.getChannelData(0);const p=new Int16Array(a.length);for(let i=0;i<a.length;i++){const s=Math.max(-1,Math.min(1,a[i]));p[i]=s<0?s*0x8000:s*0x7FFF}ws.send(p.buffer)}};ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}if(m.type==="UtteranceEnd"){flush();return}if(m.type!=="Results")return;const al=m.channel&&m.channel.alternatives&&m.channel.alternatives[0];if(!al||!al.transcript)return;const tx=al.transcript;if(m.is_final){buf=(buf+" "+tx).trim();if(diarize&&al.words&&al.words.length)al.words.forEach(w=>bufWords.push(w.speaker||0));splitSentencesBuf();liveEn.textContent=buf;if(m.speech_final)flush()}else{liveEn.textContent=(buf+" "+tx).trim()}};ws.onerror=()=>st("WebSocket 错误");ws.onclose=()=>{if(run)st("连接断开");clean()}};
+stopBtn.onclick=()=>{run=false;flush();if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({type:"CloseStream"}))}catch(e){}ws.close()}clean();st("已停止");startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false};
+function majoritySpeakerOf(start,count){const cnt={};let best=0,bestN=-1;for(let i=start;i<start+count&&i<bufWords.length;i++){const s=bufWords[i];cnt[s]=(cnt[s]||0)+1;if(cnt[s]>bestN){bestN=cnt[s];best=s}}return best}
+function splitSentencesBuf(){const re=/[^.?!]*[.?!]+/g;let m,last=0,emitted=false;while((m=re.exec(buf))!==null){const s=m[0].trim();if(s){if(isFiller(s)){pendingFiller+=(pendingFiller?" ":"")+s;emitted=true}else{const final=pendingFiller?pendingFiller+" "+s:s;pendingFiller="";emitted=true;chunkAndArchive(final)}}last=re.lastIndex}if(emitted){buf=buf.slice(last).trim();liveEn.textContent=buf;liveZh.textContent=""}}
+function chunkAndArchive(text){smartChunk(text,MAX_CHARS).forEach((part,i)=>{part=part.trim();if(!part)return;const wc=part.split(/\s+/).length;const segSpk=diarize?majoritySpeakerOf(0,wc):-1;if(diarize&&i===0)bufWords.splice(0,wc);archive(part,segSpk)})}
+function smartChunk(text,maxLen){if(text.length<=maxLen)return[text];const sentences=text.match(/[^.!?]*[.!?]+/g)||[text];const chunks=[];let cur="";for(const s of sentences){if(cur&&(cur+s).length>maxLen){chunks.push(cur.trim());cur=s}else cur+=s}if(cur.trim())chunks.push(cur.trim());return chunks.length?chunks:[text]}
+function flush(){let s=buf.trim();if(pendingFiller){s=pendingFiller+" "+s;pendingFiller=""}buf="";liveEn.textContent="";liveZh.textContent="";if(s.trim()){chunkAndArchive(s.trim());bufWords=[]}}
+function clean(){try{if(proc){proc.disconnect();proc.onaudioprocess=null}}catch(e){}try{if(src)src.disconnect()}catch(e){}try{if(ac)ac.close()}catch(e){}try{if(stream)stream.getTracks().forEach(t=>t.stop())}catch(e){}startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false}
+function archive(en,spk){const d=document.createElement("div");d.className="item";const tag=spk>=0?`<span class="spk" style="background:${spkColor(spk)}">说话人 ${spk+1}</span>`:"";d.innerHTML=tag+'<div class="en"></div><div class="zh"><span class="spinner"></span>翻译中...</div>';const enEl=d.querySelector(".en"),zhEl=d.querySelector(".zh");enEl.textContent=en;enEl.style.fontSize=(17*fontScale)+"px";zhEl.style.fontSize=(21*fontScale)+"px";hist.insertBefore(d,hist.firstChild);while(hist.children.length>MAX_ITEMS)hist.removeChild(hist.lastChild);translateRetry(en,zhEl,2)}
+function translateRetry(text,el,tries){translate(text).then(zh=>{el.textContent=zh;rememberContext(text,zh)}).catch(err=>{if(tries>0)setTimeout(()=>translateRetry(text,el,tries-1),800);else el.textContent="[翻译失败] "+err.message})}
+async function translate(text){const payload={text,context:contextHistory,glossary,mode,courseHint};const r=await fetch(apiUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"HTTP "+r.status)}const j=await r.json();return j.translation||j.text||""}
 </script>
 </body>
 </html>
