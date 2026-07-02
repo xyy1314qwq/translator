@@ -52,11 +52,10 @@ label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
 </div>
 <div id="live"><div id="liveEn"></div><div id="liveZh"></div></div>
 <div id="hist"></div>
-
 <div id="glossaryOverlay">
 <div class="modal">
 <h3>术语库</h3>
-<p>每行一个术语：英文=中文。翻译时会连同上下文发给 Worker。</p>
+<p>每行一个术语：英文=中文</p>
 <textarea id="glossaryTextarea" spellcheck="false"></textarea>
 <div class="actions">
 <button id="glossaryClear" class="gray">清空</button>
@@ -64,37 +63,36 @@ label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
 </div>
 </div>
 </div>
-
 <div id="settingsOverlay">
 <div class="modal">
 <h3>翻译设置</h3>
-<p>翻译慢一点但句子更完整，通常比碎片化实时翻译更准。</p>
 <label for="apiInput">翻译 Worker 地址</label>
 <input id="apiInput" type="url">
 <label for="modeSelect">翻译风格</label>
 <select id="modeSelect">
-<option value="lecture">课堂字幕：自然、准确、适合阅读</option>
-<option value="literal">忠实直译：尽量保留原句结构</option>
-<option value="notes">复习笔记：整理成更清楚的中文</option>
+<option value="lecture">课堂字幕：自然准确</option>
+<option value="literal">忠实直译</option>
+<option value="notes">复习笔记</option>
 </select>
 <label for="courseInput">课程/领域提示</label>
-<input id="courseInput" placeholder="例如：传媒研究、设计软件、计算机科学">
+<input id="courseInput" placeholder="例如：传媒研究、设计软件">
 <div class="actions">
 <button id="settingsCancel" class="gray">取消</button>
 <button id="settingsSave" style="background:#238636;color:#fff">保存</button>
 </div>
 </div>
 </div>
-
 <script>
+const ENC_KEY="xz29kLpQ7wM3";
+function decrypt(encoded,key){const text=atob(encoded);let result="";for(let i=0;i<text.length;i++){result+=String.fromCharCode(text.charCodeAt(i)^key.charCodeAt(i%key.length))}return result}
+let dgKey=null;
+(async function(){try{const r=await fetch("https://translator-api.xyy3041964059.workers.dev/dgkey");const j=await r.json();dgKey=decrypt(j.key,ENC_KEY)}catch(e){}})();
 const $=id=>document.getElementById(id);
 const startBtn=$("startBtn"),stopBtn=$("stopBtn"),spkBtn=$("spkBtn"),statusEl=$("status"),liveEn=$("liveEn"),liveZh=$("liveZh"),hist=$("hist"),fontUp=$("fontUp"),fontDown=$("fontDown"),exportBtn=$("exportBtn"),glossaryBtn=$("glossaryBtn"),settingsBtn=$("settingsBtn"),ctxBtn=$("ctxBtn");
 const glossaryOverlay=$("glossaryOverlay"),glossaryTextarea=$("glossaryTextarea"),glossarySave=$("glossarySave"),glossaryClear=$("glossaryClear");
 const settingsOverlay=$("settingsOverlay"),apiInput=$("apiInput"),modeSelect=$("modeSelect"),courseInput=$("courseInput"),settingsSave=$("settingsSave"),settingsCancel=$("settingsCancel");
 const DEFAULT_API="https://translator-api.xyy3041964059.workers.dev";
-const DEFAULT_GLOSSARY=[
-"academic integrity=学术诚信","plagiarism=抄袭","peer review=同行评审","citation=引用","methodology=研究方法","rhetoric=修辞学","stakeholder=利益相关者","presentation skills=演讲技巧","user interface=用户界面","user experience=用户体验","prototype=原型","responsive design=响应式设计","typography=字体排印","cinematography=电影摄影","storyboard=分镜脚本","post-production=后期制作","narrative structure=叙事结构","media literacy=媒介素养","digital media=数字媒体","semiotics=符号学","representation=表征","user-generated content=用户生成内容","layer=图层","mask=蒙版","opacity=不透明度","blending mode=混合模式","filter=滤镜","smart object=智能对象","resolution=分辨率","pixel=像素","vector=矢量","path=路径","anchor point=锚点","artboard=画板","stroke=描边","fill=填充","gradient=渐变","timeline=时间线","keyframe=关键帧","transition=转场","render=渲染","export=导出","composition=合成","motion graphics=动态图形","visual effects=视觉特效","green screen=绿幕","layout=版面布局","bleed=出血","margin=页边距","asset=素材","workflow=工作流"
-].join("\n");
+const DEFAULT_GLOSSARY="academic integrity=学术诚信\nplagiarism=抄袭\npeer review=同行评审\ncitation=引用\nmethodology=研究方法\nrhetoric=修辞学\nstakeholder=利益相关者\nuser interface=用户界面\nuser experience=用户体验\nprototype=原型\nresponsive design=响应式设计\ntypography=字体排印\ncinematography=电影摄影\nstoryboard=分镜脚本\npost-production=后期制作\nnarrative structure=叙事结构\nmedia literacy=媒介素养\ndigital media=数字媒体\nsemiotics=符号学\nrepresentation=表征\nlayer=图层\nmask=蒙版\nopacity=不透明度\nblending mode=混合模式\nfilter=滤镜\nresolution=分辨率\npixel=像素\nvector=矢量\npath=路径\nanchor point=锚点\nstroke=描边\nfill=填充\ngradient=渐变\ntimeline=时间线\nkeyframe=关键帧\ntransition=转场\nrender=渲染\nexport=导出\ncomposition=合成\nmotion graphics=动态图形\nvisual effects=视觉特效\ngreen screen=绿幕\nlayout=版面布局\nmargin=页边距\nasset=素材\nworkflow=工作流";
 let ws,ac,proc,src,stream,run=false;
 let buf="",bufWords=[],diarize=false,pendingFiller="";
 let glossary=localStorage.getItem("glossary")||DEFAULT_GLOSSARY;
@@ -114,6 +112,8 @@ function refreshGlossaryButton(){if(glossary){glossaryBtn.className="glossary-ac
 function applyFont(){liveEn.style.fontSize=(20*fontScale)+"px";liveZh.style.fontSize=(22*fontScale)+"px";document.querySelectorAll(".en").forEach(el=>el.style.fontSize=(17*fontScale)+"px");document.querySelectorAll(".zh").forEach(el=>el.style.fontSize=(21*fontScale)+"px")}
 function rememberContext(en,zh){if(!contextEnabled)return;contextHistory.push({en,zh});if(contextHistory.length>CONTEXT_LIMIT)contextHistory=contextHistory.slice(-CONTEXT_LIMIT)}
 glossaryTextarea.value=glossary;apiInput.value=apiUrl;modeSelect.value=mode;courseInput.value=courseHint;refreshGlossaryButton();applyFont();
+if(contextEnabled){ctxBtn.className="glossary-active";ctxBtn.textContent="上下文：开"}else{ctxBtn.className="gray";ctxBtn.textContent="上下文：关"}
+ctxBtn.onclick=()=>{contextEnabled=!contextEnabled;localStorage.setItem("contextEnabled",contextEnabled?"1":"0");if(contextEnabled){ctxBtn.className="glossary-active";ctxBtn.textContent="上下文：开"}else{ctxBtn.className="gray";ctxBtn.textContent="上下文：关";contextHistory=[]}};
 glossaryBtn.onclick=()=>{glossaryOverlay.classList.add("show");glossaryTextarea.focus()};
 glossaryOverlay.onclick=e=>{if(e.target===glossaryOverlay)glossaryOverlay.classList.remove("show")};
 glossarySave.onclick=()=>{glossary=glossaryTextarea.value.trim();localStorage.setItem("glossary",glossary);refreshGlossaryButton();glossaryOverlay.classList.remove("show")};
@@ -124,17 +124,9 @@ settingsCancel.onclick=()=>settingsOverlay.classList.remove("show");
 settingsSave.onclick=()=>{apiUrl=apiInput.value.trim()||DEFAULT_API;mode=modeSelect.value;courseHint=courseInput.value.trim();localStorage.setItem("apiUrl",apiUrl);localStorage.setItem("translationMode",mode);localStorage.setItem("courseHint",courseHint);settingsOverlay.classList.remove("show")};
 fontUp.onclick=()=>{fontScale=Math.min(2.5,fontScale+0.15);localStorage.setItem("fontScale",fontScale);applyFont()};
 fontDown.onclick=()=>{fontScale=Math.max(0.6,fontScale-0.15);localStorage.setItem("fontScale",fontScale);applyFont()};
-exportBtn.onclick=()=>{const items=hist.getElementsByClassName("item");if(!items.length){alert("还没有内容可导出");return}let txt="";for(let i=items.length-1;i>=0;i--){txt+=items[i].querySelector(".en").textContent+"\n"+items[i].querySelector(".zh").textContent+"\n\n"}const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);const d=new Date();a.download=`课堂记录_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}_${d.getHours()}.${d.getMinutes()}.txt`;a.click()};
-if(contextEnabled){ctxBtn.className="glossary-active";ctxBtn.textContent="上下文：开"}
-else{ctxBtn.className="gray";ctxBtn.textContent="上下文：关"}
-ctxBtn.onclick=()=>{
-contextEnabled=!contextEnabled;
-localStorage.setItem("contextEnabled",contextEnabled?"1":"0");
-if(contextEnabled){ctxBtn.className="glossary-active";ctxBtn.textContent="上下文：开"}
-else{ctxBtn.className="gray";ctxBtn.textContent="上下文：关";contextHistory=[]}
-};
-spkBtn.onclick=()=>{if(run){alert("请先停止识别，再切换分人模式。");return}diarize=!diarize;spkBtn.textContent=diarize?"分人：开":"分人：关"};
-startBtn.onclick=async()=>{if(run)return;contextHistory=[];try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){st("麦克风失败");alert(e.message);return}ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});if(ac.state==="suspended")await ac.resume();src=ac.createMediaStreamSource(stream);proc=ac.createScriptProcessor(4096,1,1);src.connect(proc);proc.connect(ac.destination);let url="wss://plush-stork-8356.xyy3041964059.deno.net/dgws?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=1400&utterance_end_ms=2200&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";if(diarize)url+="&diarize=true";st(diarize?"连接中（分人开）...":"连接中...");ws=new WebSocket(url);ws.onopen=()=>{run=true;st(diarize?"正在识别（分人开）":"正在识别");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;proc.onaudioprocess=e=>{if(!run||ws.readyState!==1)return;const a=e.inputBuffer.getChannelData(0);const p=new Int16Array(a.length);for(let i=0;i<a.length;i++){const s=Math.max(-1,Math.min(1,a[i]));p[i]=s<0?s*0x8000:s*0x7FFF}ws.send(p.buffer)}};ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}if(m.type==="UtteranceEnd"){flush();return}if(m.type!=="Results")return;const al=m.channel&&m.channel.alternatives&&m.channel.alternatives[0];if(!al||!al.transcript)return;const tx=al.transcript;if(m.is_final){buf=(buf+" "+tx).trim();if(diarize&&al.words&&al.words.length)al.words.forEach(w=>bufWords.push(w.speaker||0));splitSentencesBuf();liveEn.textContent=buf;if(m.speech_final)flush()}else{liveEn.textContent=(buf+" "+tx).trim()}};ws.onerror=()=>st("WebSocket 错误");ws.onclose=()=>{if(run)st("连接断开");clean()}};
+exportBtn.onclick=()=>{const items=hist.getElementsByClassName("item");if(!items.length){alert("没有内容可导出");return}let txt="";for(let i=items.length-1;i>=0;i--){txt+=items[i].querySelector(".en").textContent+"\n"+items[i].querySelector(".zh").textContent+"\n\n"}const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);const d=new Date();a.download="课堂记录_"+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"_"+d.getHours()+"."+d.getMinutes()+".txt";a.click()};
+spkBtn.onclick=()=>{if(run){alert("请先停止识别");return}diarize=!diarize;spkBtn.textContent=diarize?"分人：开":"分人：关"};
+startBtn.onclick=async()=>{if(run)return;contextHistory=[];if(!dgKey){st("获取密钥中...");try{const r=await fetch("https://translator-api.xyy3041964059.workers.dev/dgkey");const j=await r.json();dgKey=decrypt(j.key,ENC_KEY)}catch(e){st("密钥失败");alert("无法获取密钥");return}}try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){st("麦克风失败");alert(e.message);return}ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});if(ac.state==="suspended")await ac.resume();src=ac.createMediaStreamSource(stream);proc=ac.createScriptProcessor(4096,1,1);src.connect(proc);proc.connect(ac.destination);let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=1400&utterance_end_ms=2200&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";if(diarize)url+="&diarize=true";st(diarize?"连接中（分人开）...":"连接中...");ws=new WebSocket(url,["token",dgKey]);ws.onopen=()=>{run=true;st(diarize?"正在识别（分人开）":"正在识别");startBtn.disabled=true;stopBtn.disabled=false;spkBtn.disabled=true;proc.onaudioprocess=e=>{if(!run||ws.readyState!==1)return;const a=e.inputBuffer.getChannelData(0);const p=new Int16Array(a.length);for(let i=0;i<a.length;i++){const s=Math.max(-1,Math.min(1,a[i]));p[i]=s<0?s*0x8000:s*0x7FFF}ws.send(p.buffer)}};ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}if(m.type==="UtteranceEnd"){flush();return}if(m.type!=="Results")return;const al=m.channel&&m.channel.alternatives&&m.channel.alternatives[0];if(!al||!al.transcript)return;const tx=al.transcript;if(m.is_final){buf=(buf+" "+tx).trim();if(diarize&&al.words&&al.words.length)al.words.forEach(w=>bufWords.push(w.speaker||0));splitSentencesBuf();liveEn.textContent=buf;if(m.speech_final)flush()}else{liveEn.textContent=(buf+" "+tx).trim()}};ws.onerror=()=>st("WebSocket 错误");ws.onclose=()=>{if(run)st("连接断开");clean()}};
 stopBtn.onclick=()=>{run=false;flush();if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({type:"CloseStream"}))}catch(e){}ws.close()}contextHistory=[];clean();st("已停止");startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false};
 function majoritySpeakerOf(start,count){const cnt={};let best=0,bestN=-1;for(let i=start;i<start+count&&i<bufWords.length;i++){const s=bufWords[i];cnt[s]=(cnt[s]||0)+1;if(cnt[s]>bestN){bestN=cnt[s];best=s}}return best}
 function splitSentencesBuf(){const re=/[^.?!]*[.?!]+/g;let m,last=0,emitted=false;while((m=re.exec(buf))!==null){const s=m[0].trim();if(s){if(isFiller(s)){pendingFiller+=(pendingFiller?" ":"")+s;emitted=true}else{const final=pendingFiller?pendingFiller+" "+s:s;pendingFiller="";emitted=true;chunkAndArchive(final)}}last=re.lastIndex}if(emitted){buf=buf.slice(last).trim();liveEn.textContent=buf;liveZh.textContent=""}}
@@ -143,8 +135,9 @@ function smartChunk(text,maxLen){if(text.length<=maxLen)return[text];const sente
 function flush(){let s=buf.trim();if(pendingFiller){s=pendingFiller+" "+s;pendingFiller=""}buf="";liveEn.textContent="";liveZh.textContent="";if(s.trim()){chunkAndArchive(s.trim());bufWords=[]}}
 function clean(){try{if(proc){proc.disconnect();proc.onaudioprocess=null}}catch(e){}try{if(src)src.disconnect()}catch(e){}try{if(ac)ac.close()}catch(e){}try{if(stream)stream.getTracks().forEach(t=>t.stop())}catch(e){}startBtn.disabled=false;stopBtn.disabled=true;spkBtn.disabled=false}
 function archive(en,spk){const d=document.createElement("div");d.className="item";const tag=spk>=0?`<span class="spk" style="background:${spkColor(spk)}">说话人 ${spk+1}</span>`:"";d.innerHTML=tag+'<div class="en"></div><div class="zh"><span class="spinner"></span>翻译中...</div>';const enEl=d.querySelector(".en"),zhEl=d.querySelector(".zh");enEl.textContent=en;enEl.style.fontSize=(17*fontScale)+"px";zhEl.style.fontSize=(21*fontScale)+"px";hist.insertBefore(d,hist.firstChild);while(hist.children.length>MAX_ITEMS)hist.removeChild(hist.lastChild);translateRetry(en,zhEl,2)}
-function translateRetry(text,el,tries){translate(text).then(zh=>{el.textContent=zh;rememberContext(text,zh)}).catch(err=>{if(tries>0)setTimeout(()=>translateRetry(text,el,tries-1),800);else el.textContent="[翻译失败] "+err.message})}
+function translateRetry(text,el,tries){translate(text).then(zh=>{el.innerHTML=zh;rememberContext(text,zh)}).catch(err=>{if(tries>0)setTimeout(()=>translateRetry(text,el,tries-1),800);else el.innerHTML="[翻译失败] "+err.message})}
 async function translate(text){const payload={text,context:contextHistory,glossary,mode,courseHint};const r=await fetch(apiUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"HTTP "+r.status)}const j=await r.json();return j.translation||j.text||""}
 </script>
 </body>
 </html>
+
