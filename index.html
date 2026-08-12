@@ -102,6 +102,7 @@ let courseHint=localStorage.getItem("courseHint")||"";
 let contextHistory=[];
 let contextEnabled=localStorage.getItem("contextEnabled")!=="0";
 const CONTEXT_LIMIT=5,MAX_ITEMS=200,MAX_CHARS=500,MIN_WORDS=7,SOFT_WORDS=24,HARD_WORDS=36;
+const DEEPGRAM_ENDPOINTING_MS=900,DEEPGRAM_UTTERANCE_END_MS=1600;
 const MAX_TEXT_CHARS=1200,MAX_GLOSSARY_CHARS=2000;
 const TRANSLATION_TOKEN_HEADER="X-Translation-Token";
 const TOKEN_REFRESH_WINDOW_MS=10_000;
@@ -161,7 +162,7 @@ async function startRecognize(){
   try{await getTranslationToken();}catch(e){st("获取密钥失败");alert(e.message || "无法获取识别凭证");return}
   try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){st("麦克风失败");alert(e.message);return}
   ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});if(ac.state==="suspended")await ac.resume();src=ac.createMediaStreamSource(stream);proc=ac.createScriptProcessor(4096,1,1);src.connect(proc);proc.connect(ac.destination);
-  let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing=1400&utterance_end_ms=2200&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
+  let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing="+DEEPGRAM_ENDPOINTING_MS+"&utterance_end_ms="+DEEPGRAM_UTTERANCE_END_MS+"&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
   if(diarize)url+="&diarize=true";
   st(diarize?"连接中（分人开）...":"连接中...");
   ws=new WebSocket(url,["token",sessionToken.value]);
