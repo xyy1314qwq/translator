@@ -1,0 +1,7 @@
+name = "translator-api"
+main = "cloudflare-worker-deepseek.js"
+compatibility_date = "2026-08-12"
+
+[vars]
+DEEPSEEK_MODEL = "deepseek-chat"
+ALLOWED_ORIGINS = "https://xyy1314qwq.github.io,http://localhost:3000,http://127.0.0.1:3000"
