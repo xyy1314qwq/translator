@@ -159,8 +159,9 @@ fontDown.onclick=()=>{fontScale=Math.max(0.6,fontScale-0.15);localStorage.setIte
 exportBtn.onclick=()=>{const items=hist.getElementsByClassName("item");if(!items.length){alert("没有内容可导出");return}let txt="";for(let i=items.length-1;i>=0;i--){txt+=items[i].querySelector(".en").textContent+"\n"+items[i].querySelector(".zh").textContent+"\n\n"}const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);const d=new Date();a.download="课堂记录_"+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"_"+d.getHours()+"."+d.getMinutes()+".txt";a.click()};
 spkBtn.onclick=()=>{if(run){alert("请先停止识别");return}diarize=!diarize;spkBtn.textContent=diarize?"分人：开":"分人：关"};
 async function startRecognize(){
-  try{await getTranslationToken();}catch(e){st("获取密钥失败");alert(e.message || "无法获取识别凭证");return}
-  try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){st("麦克风失败");alert(e.message);return}
+  startBtn.disabled=true;
+  try{st("申请麦克风...");stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}catch(e){startBtn.disabled=false;st("麦克风失败");alert(e.message || "无法访问麦克风");return}
+  try{await getTranslationToken();}catch(e){try{if(stream)stream.getTracks().forEach(t=>t.stop())}catch(ignore){}stream=null;startBtn.disabled=false;st("获取密钥失败");alert(e.message || "无法获取识别凭证");return}
   ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});if(ac.state==="suspended")await ac.resume();src=ac.createMediaStreamSource(stream);proc=ac.createScriptProcessor(4096,1,1);src.connect(proc);proc.connect(ac.destination);
   let url="wss://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&interim_results=true&endpointing="+DEEPGRAM_ENDPOINTING_MS+"&utterance_end_ms="+DEEPGRAM_UTTERANCE_END_MS+"&vad_events=true&encoding=linear16&sample_rate=16000&channels=1&noise_reduction=true";
   if(diarize)url+="&diarize=true";
