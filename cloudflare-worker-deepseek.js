@@ -67,7 +67,7 @@ function resolveCorsOrigin(origin, env) {
 
 function json(data, status = 200, corsOrigin = "*") {
   return new Response(
-    JSON.stringify(data),
+    status === 204 ? null : JSON.stringify(data),
     {
       status,
       headers: {
