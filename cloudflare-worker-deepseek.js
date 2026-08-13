@@ -343,11 +343,18 @@ export default {
       return json(null, 204, corsOrigin);
     }
 
+    const { pathname } = new URL(request.url);
+    if (
+      pathname === "/listen" &&
+      request.headers.get("Upgrade")?.toLowerCase() === "websocket"
+    ) {
+      return handleListen(request, env, corsOrigin);
+    }
+
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405, corsOrigin);
     }
 
-    const { pathname } = new URL(request.url);
     if (pathname === "/token") {
       return handleToken(request, env, corsOrigin);
     }
@@ -365,6 +372,60 @@ async function handleToken(request, env, corsOrigin) {
   const token = await issueTranslationToken(env, request);
   const deepgramToken = await grantDeepgramToken(env.DEEPGRAM_API_KEY);
   return json({ ...token, deepgramToken }, 200, corsOrigin);
+}
+
+const DEEPGRAM_WS_QUERY_KEYS = new Set([
+  "model",
+  "language",
+  "smart_format",
+  "punctuate",
+  "interim_results",
+  "endpointing",
+  "utterance_end_ms",
+  "vad_events",
+  "encoding",
+  "sample_rate",
+  "channels",
+  "noise_reduction",
+  "diarize",
+]);
+
+async function handleListen(request, env, corsOrigin) {
+  if (!env?.DEEPGRAM_API_KEY || !env?.[TOKEN_SECRET]) {
+    return json({ error: "WebSocket relay is not configured" }, 500, corsOrigin);
+  }
+
+  const protocols = (request.headers.get("Sec-WebSocket-Protocol") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const token = protocols.find((value) => value !== "translator") || "";
+  const verified = await verifyTranslationToken(env, request, token);
+  if (!verified.ok) {
+    return json({ error: "Invalid translation token" }, 401, corsOrigin);
+  }
+
+  const sourceUrl = new URL(request.url);
+  const upstreamUrl = new URL("https://api.deepgram.com/v1/listen");
+  for (const [key, value] of sourceUrl.searchParams) {
+    if (DEEPGRAM_WS_QUERY_KEYS.has(key)) upstreamUrl.searchParams.append(key, value);
+  }
+
+  const upstreamResponse = await fetch(upstreamUrl, {
+    headers: {
+      Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
+      Upgrade: "websocket",
+    },
+  });
+  if (!upstreamResponse.webSocket) {
+    return json({ error: "Deepgram WebSocket unavailable" }, 502, corsOrigin);
+  }
+
+  return new Response(null, {
+    status: 101,
+    webSocket: upstreamResponse.webSocket,
+    headers: { "Sec-WebSocket-Protocol": "translator" },
+  });
 }
 
 async function handleTranslate(request, env, corsOrigin) {
