@@ -159,6 +159,22 @@ function newNonce() {
     .join("");
 }
 
+async function grantDeepgramToken(apiKey) {
+  const response = await fetch("https://api.deepgram.com/v1/auth/grant", {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ttl_seconds: 60 }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || typeof data.access_token !== "string") {
+    throw new Error(data.err_msg || data.error || `Deepgram token request failed (${response.status})`);
+  }
+  return data.access_token;
+}
+
 function buildTokenClaims(request) {
   const now = Date.now();
   return {
@@ -173,8 +189,8 @@ function buildTokenClaims(request) {
 }
 
 async function issueTranslationToken(env, request) {
-  if (!env?.[DEEPSEEK_TOKEN]) {
-    throw new Error("DEEPSEEK_API_KEY is required");
+  if (!env?.DEEPGRAM_API_KEY) {
+    throw new Error("DEEPGRAM_API_KEY is required");
   }
   if (!env?.[TOKEN_SECRET]) {
     throw new Error("TRANSLATION_TOKEN_SECRET is required");
@@ -347,7 +363,8 @@ async function handleToken(request, env, corsOrigin) {
     return json({ error: "TRANSLATION_TOKEN_SECRET is required" }, 500, corsOrigin);
   }
   const token = await issueTranslationToken(env, request);
-  return json(token, 200, corsOrigin);
+  const deepgramToken = await grantDeepgramToken(env.DEEPGRAM_API_KEY);
+  return json({ ...token, deepgramToken }, 200, corsOrigin);
 }
 
 async function handleTranslate(request, env, corsOrigin) {

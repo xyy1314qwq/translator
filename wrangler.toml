@@ -1,6 +1,7 @@
 name = "translator-api"
 main = "cloudflare-worker-deepseek.js"
 compatibility_date = "2026-08-12"
+keep_vars = true
 
 [vars]
 DEEPSEEK_MODEL = "deepseek-v4-flash"
