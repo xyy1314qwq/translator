@@ -1,0 +1,15 @@
+{
+  "name": "classroom-translator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "check": "node --check cloudflare-worker-deepseek.js && node --check usage-budget.js",
+    "dev": "wrangler dev",
+    "deploy:check": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "miniflare": "5.20260930.0-alpha",
+    "wrangler": "4.145.0"
+  }
+}

@@ -7,3 +7,18 @@ keep_vars = true
 DEEPSEEK_MODEL = "deepseek-v4-flash"
 DEEPSEEK_MAX_TOKENS = "220"
 ALLOWED_ORIGINS = "https://xyy1314qwq.github.io,http://localhost:3000,http://127.0.0.1:3000"
+MAX_CONCURRENT_PER_IP = "2"
+MAX_CONCURRENT_GLOBAL = "4"
+MAX_SESSION_SECONDS = "10800"
+DAILY_AUDIO_SECONDS_PER_IP = "21600"
+DAILY_AUDIO_SECONDS_GLOBAL = "43200"
+DAILY_TRANSLATIONS_PER_IP = "3000"
+DAILY_TRANSLATIONS_GLOBAL = "6000"
+
+[[durable_objects.bindings]]
+name = "USAGE_GUARD"
+class_name = "UsageGuard"
+
+[[migrations]]
+tag = "usage-guard-v1"
+new_sqlite_classes = ["UsageGuard"]
